@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, transform};
 
 /**
  * - Create 2d vec array each frame
@@ -13,13 +13,31 @@ fn main() {
     App::new()
         .insert_resource(Map::new(100., 25.))
         .add_startup_system(startup)
-        // .add_plugins(DefaultPlugins)
+        .add_system(rebuild_map.in_base_set(CoreSet::PreUpdate))
+        .add_system(update)
+        .add_plugins(DefaultPlugins)
         .run();
 }
 
-fn startup(mut commands: Commands, mut map: ResMut<Map>) {
+fn startup(mut commands: Commands) {
+    commands.spawn((Transform::IDENTITY, EntityToTrack));
+}
+
+fn rebuild_map(mut map: ResMut<Map>, entities: Query<(Entity, &Transform), With<EntityToTrack>>) {
     map.build();
-    map.insert_entity(commands.spawn(()).id(), &Vec3::new(0., 99., 0.));
+
+    for (entity, transform) in &entities {
+        map.insert_entity(entity, &transform.translation);
+    }
+}
+
+fn update(map: Res<Map>, mut transforms: Query<&mut Transform, With<EntityToTrack>>) {
+    for mut transform in transforms.iter_mut() {
+        transform.translation.x += 1.;
+        transform.translation.y += 3.4;
+        transform.translation.x = transform.translation.x % 100.;
+        transform.translation.y = transform.translation.y % 100.;
+    }
 
     for (i, cell) in map.cells.iter().enumerate() {
         if i % map.columns == 0 {
@@ -27,7 +45,12 @@ fn startup(mut commands: Commands, mut map: ResMut<Map>) {
         }
         print!("{} ", cell.len());
     }
+
+    println!();
 }
+
+#[derive(Component)]
+struct EntityToTrack;
 
 #[derive(Resource)]
 pub struct Map {
