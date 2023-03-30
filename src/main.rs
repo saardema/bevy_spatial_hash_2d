@@ -1,6 +1,10 @@
-use std::ops::Range;
+use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
+use bevy::prelude::*;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use spatial::{EntityToTrack, SpatialHash2d, SpatialHash2dPlugin};
 
-use bevy::{prelude::*, transform};
+use rand::Rng;
+mod spatial;
 
 /**
  * - Create 2d vec array each frame
@@ -9,96 +13,45 @@ use bevy::{prelude::*, transform};
  * - Push entity at index
  */
 
+const MAP_SIZE: f32 = 300.;
+const MAP_CELL_SIZE: f32 = 5.;
+
+#[derive(Component)]
+struct Thing {
+    direction: Vec3,
+}
+
 fn main() {
     App::new()
-        .insert_resource(Map::new(100., 25.))
-        .add_startup_system(startup)
-        .add_system(rebuild_map.in_base_set(CoreSet::PreUpdate))
-        .add_system(update)
         .add_plugins(DefaultPlugins)
+        .add_plugin(SpatialHash2dPlugin)
+        .add_plugin(LogDiagnosticsPlugin::default())
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        // .add_plugin(WorldInspectorPlugin::default())
+        .insert_resource(SpatialHash2d::new(MAP_SIZE, MAP_CELL_SIZE))
+        .add_startup_system(startup)
+        .add_system(update)
         .run();
 }
 
 fn startup(mut commands: Commands) {
-    commands.spawn((Transform::IDENTITY, EntityToTrack));
-}
+    commands.spawn(Camera2dBundle {
+        transform: Transform::from_xyz(MAP_SIZE / 2., MAP_SIZE / 2., 999.),
+        ..default()
+    });
 
-fn rebuild_map(mut map: ResMut<Map>, entities: Query<(Entity, &Transform), With<EntityToTrack>>) {
-    map.build();
-
-    for (entity, transform) in &entities {
-        map.insert_entity(entity, &transform.translation);
+    for _ in 0..30 {
+        let mut rng = rand::thread_rng();
+        let direction = Vec3::new(rng.gen::<f32>() - 0.5, rng.gen::<f32>() - 0.5, 0.) * 100.;
+        commands.spawn((Transform::IDENTITY, EntityToTrack, Thing { direction }));
     }
 }
 
-fn update(map: Res<Map>, mut transforms: Query<&mut Transform, With<EntityToTrack>>) {
-    for mut transform in transforms.iter_mut() {
-        transform.translation.x += 1.;
-        transform.translation.y += 3.4;
-        transform.translation.x = transform.translation.x % 100.;
-        transform.translation.y = transform.translation.y % 100.;
-    }
+fn update(mut transforms: Query<(&mut Transform, &Thing)>, time: Res<Time>) {
+    for (mut transform, thing) in transforms.iter_mut() {
+        transform.translation += thing.direction * time.delta_seconds();
 
-    for (i, cell) in map.cells.iter().enumerate() {
-        if i % map.columns == 0 {
-            println!();
-        }
-        print!("{} ", cell.len());
-    }
-
-    println!();
-}
-
-#[derive(Component)]
-struct EntityToTrack;
-
-#[derive(Resource)]
-pub struct Map {
-    range: Range<f32>,
-    total_cells: usize,
-    cell_size: f32,
-    columns: usize,
-    cells: Vec<Vec<Entity>>,
-}
-
-impl Map {
-    pub fn new(size: f32, cell_size: f32) -> Self {
-        let cells = vec![];
-        let range = 0.0..size;
-        let columns = (size / cell_size).ceil() as usize;
-        let total_cells = columns * columns;
-
-        Self {
-            range,
-            cell_size,
-            total_cells,
-            columns,
-            cells,
-        }
-    }
-
-    pub fn build(&mut self) {
-        self.cells = vec![];
-
-        for _ in 0..self.total_cells {
-            self.cells.push(vec![]);
-        }
-    }
-
-    pub fn insert_entity(&mut self, entity: Entity, position: &Vec3) {
-        if let Some(index) = self.get_index(position) {
-            self.cells[index].push(entity);
-        }
-    }
-
-    fn get_index(&self, position: &Vec3) -> Option<usize> {
-        if !self.range.contains(&position.x) || !self.range.contains(&position.y) {
-            return None;
-        }
-
-        let index = (position.x / self.cell_size) as usize
-            + (position.y / self.cell_size) as usize * self.columns;
-
-        Some(index)
+        transform.translation.x = (transform.translation.x + MAP_SIZE) % MAP_SIZE;
+        transform.translation.y = (transform.translation.y + MAP_SIZE) % MAP_SIZE;
     }
 }

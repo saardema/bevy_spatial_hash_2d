@@ -5,41 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "lldb",
+            "name": "Quick Launch",
+            "type": "node-terminal",
             "request": "launch",
-            "name": "Debug executable 'partitioning'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=partitioning",
-                    "--package=partitioning"
-                ],
-                "filter": {
-                    "name": "partitioning",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
+            "command": "cargo run",
         },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'partitioning'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=partitioning",
-                    "--package=partitioning"
-                ],
-                "filter": {
-                    "name": "partitioning",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        }
     ]
 }
